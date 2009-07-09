@@ -1,0 +1,6 @@
+#summary class to parse a google query
+
+= Introduction =
+
+This class is used internally to parse a query (the tq param).
+
