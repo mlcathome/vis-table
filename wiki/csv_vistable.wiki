@@ -7,7 +7,7 @@ csv_vistable is a simple extension of vistable that reads a csv file and serves 
 
 = Details =
 
-See test/csvtable.php for usage.
+See test/csvtable.php for usage (or try it out at [http://maps.myosotissp.com/vistable/test/csvtable.php])
 
 The first row of the csv file is taken as the column ids.
 
