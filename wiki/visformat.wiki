@@ -1,0 +1,5 @@
+#summary date, number and boolean formatters
+
+= Introduction =
+
+This class handles the "format" clause
