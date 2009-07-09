@@ -734,11 +734,14 @@ abstract class vistable {
             header('Content-type: text/html; charset="UTF-8"');
 
             $out = "<html><body><table border='1' cellpadding='2' cellspacing='0'>";
-            if (isset($this->response['errors'])) {
-                $out .= self::html_diagnostic($this->response['errors'],"#f00");
-            }
-            if (isset($this->response['warnings'])) {
-                $out .= self::html_diagnostic($this->response['warnings'],"#ff0");
+            if ($this->response['status'] != 'ok') {
+                if (isset($this->response['errors'])) {
+                    $out .= self::html_diagnostic($this->response['errors'],"#f00");
+                }
+                if (isset($this->response['warnings'])) {
+                    $out .= self::html_diagnostic($this->response['warnings'],"#ff0");
+                }
+                $out .= "</table><table border='1' cellpadding='2' cellspacing='0'>";
             }
             if ($table) {
                 $out .= self::html_row($table['cols'], 'label', 'font-weight: bold; background-color: #aaa;');
@@ -785,12 +788,10 @@ abstract class vistable {
         foreach ($diagnostics as $diag) {
             $out .= "<tr style='background-color: $color'>";
             $out .= "<td>{$diag['reason']}</td>";
-            if (isset($diag['message'])) {
-                $out .= "<td>{$diag['message']}</td>";
-            }
-            if (isset($diag['detailed_message'])) {
-                $out .= "<td>{$diag['detailed_message']}</td>";
-            }
+            $msg = isset($diag['message']) ? $diag['message'] : "&nbsp;";
+            $out .= "<td>$msg</td>";
+            $msg = isset($diag['detailed_message']) ? $diag['detailed_message'] : "&nbsp;";
+            $out .= "<td>$msg</td>";
             $out .= "</tr>";
         }
         return $out;
