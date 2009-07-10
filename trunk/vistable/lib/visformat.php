@@ -294,7 +294,7 @@ class NumberFormatter {
         $s = $t . $s;
         $t = $format[0] . $s . $format[3];
         $len = strlen($t);
-        if ($format['pad']) {
+        if (isset($format['pad'])) {
             $plen = $format['format_width'];
             if ($plen > $len) {
                 $pad = str_pad("", $plen - $len, $format['pad']);
