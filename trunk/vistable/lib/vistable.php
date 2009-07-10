@@ -326,7 +326,7 @@ abstract class vistable {
                     $v = (double)$v;
                     break;
                 case 'boolean':
-                    if (is_string($v) && stricmp($v, "false")) {
+                    if (is_string($v) && strcasecmp($v, "false")) {
                         $v = FALSE;
                     } else {
                         $v = (bool)$v;
