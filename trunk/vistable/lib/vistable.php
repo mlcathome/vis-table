@@ -326,7 +326,7 @@ abstract class vistable {
                     $v = (double)$v;
                     break;
                 case 'boolean':
-                    if (is_string($v) && strcasecmp($v, "false")) {
+                    if (is_string($v) && !strcasecmp($v, "false")) {
                         $v = FALSE;
                     } else {
                         $v = (bool)$v;
@@ -757,7 +757,10 @@ abstract class vistable {
 
         case 'debug':
             header('Content-type: text/plain; charset="UTF-8"');
-            $out = print_r($this->response, TRUE);
+            ob_start();
+            var_dump($this->response);
+            $out=ob_get_contents();
+            ob_end_clean();
             break;
         }
 
@@ -964,11 +967,11 @@ class mysql_vistable extends vistable {
         if (isset($query['order'])) {
             foreach ($query['order'] as $value) {
                 $dir = isset($value['dir']) && $value['dir'] == 'desc' ? 'desc' : 'asc';
-                $s = $this->sql_expr($value, 1);
+                $as = $this->sql_expr($value, 0);
                 if (!isset($fields[$as])) {
                     $o = $this->sql_expr($value,1);
                 } else {
-                    $o = "`$s`";
+                    $o = "`$as`";
                 }
                 $order[] = "$o $dir";
             }
