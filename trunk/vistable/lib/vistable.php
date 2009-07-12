@@ -721,7 +721,12 @@ abstract class vistable {
             $out = $this->params['responseHandler']."($out);\n";
             break;
         case 'csv':
-            header('Content-type: text/plain; charset="UTF-8"');
+            if (isset($this->params['outFileName'])) {
+                header('Content-type: text/csv; charset="UTF-8"');
+                header('Content-disposition: attachment; filename='.$this->params['outFileName']);
+            } else {
+                header('Content-type: text/plain; charset="UTF-8"');
+            }
 
             if ($table) {
                 $out = self::csv_row($table['cols'], "label");
@@ -753,6 +758,19 @@ abstract class vistable {
                 }
             }
             $out .= "</table></body></html>";
+        case 'tsv-excel':
+            if (isset($this->params['outFileName'])) {
+                header('Content-type: text/text/tab-separated-values; charset="UTF-16"');
+                header('Content-disposition: attachment; filename='.$this->params['outFileName']);
+            } else {
+                header('Content-type: text/plain; charset="UTF-16"');
+            }
+            if ($table) {
+                $out = self::tsv_row($table['cols'], "label");
+                foreach ($table['rows'] as $row) {
+                    $out .= self::tsv_row($row['c'], 'f');
+                }
+            }
             break;
 
         case 'debug':
@@ -769,6 +787,16 @@ abstract class vistable {
 
     private static function csv_row($r, $id)
     {
+        return self::sv_row($r,$id,',');
+    }
+
+    private static function tsv_row($r, $id)
+    {
+        return iconv("UTF-8", "UTF-16", self::sv_row($r,$id,"\t"));
+    }
+
+    private static function sv_row($r, $id,$sep)
+    {
         $out = array();
         foreach ($r as $v) {
             if (!$v) {
@@ -776,13 +804,13 @@ abstract class vistable {
             } else {                
                 $x = $v[$id];
             }
-            if (strpbrk($x, '",')) {
+            if (strpbrk($x, '"'.$sep)) {
                 $x = str_replace('"','""',$x);
                 $x = '"'.$x.'"';
             }
             $out[] = $x;
         }
-        return implode(",", $out)."\n";
+        return implode($sep, $out)."\n";
     }
 
     private static function html_diagnostic($diagnostics, $color)
