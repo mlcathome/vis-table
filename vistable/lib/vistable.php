@@ -392,6 +392,9 @@ abstract class vistable {
             if ($col['is_pivot'] || $col['is_group']) {
                 $c['group'] = 1;
             }
+            if ($col['is_aggregate']) {
+                $c['is_aggregate'] = 1;
+            }
             $cols[] = $c;
             $exprs[$s] =& $col;
         }
@@ -530,7 +533,7 @@ abstract class vistable {
 
             // Copy "grouped" columns to new col array
             foreach ($cols as $col) {
-                if ($col['group']) {
+                if (!$col['is_aggregate']) {
                     $ncols[] = $col;
                 }
             }
@@ -538,7 +541,7 @@ abstract class vistable {
             // Create pivoted columns for non-"grouped" columns
             foreach ($pivots as $pivot => $value) {
                 foreach ($cols as $col) {
-                    if (!$col['group']) {
+                    if ($col['is_aggregate']) {
                         $col['id'] = $pivot.$col["id"];
                         $col['label'] = $pivot.$col["label"];
                         $ncols[] = $col;
@@ -550,7 +553,7 @@ abstract class vistable {
                 $nrow = array();
                 // get the "grouped" elements of the row
                 foreach ($cols as $col) {
-                    if ($col['group']) {
+                    if (!$col['is_aggregate']) {
                         foreach ($rs as $row) {
                             $nrow[] = $row[$col['id']];
                             break;
@@ -561,7 +564,7 @@ abstract class vistable {
                 foreach ($pivots as $pivot => $value) {
                     $row = isset($rs[$pivot]) ? $rs[$pivot] : NULL;
                     foreach ($cols as $col) {
-                        if (!$col['group']) {
+                        if ($col['is_aggregate']) {
                             $nrow[] = $row !== NULL ? $row[$col['id']] : NULL;
                         }
                     }
@@ -758,6 +761,7 @@ abstract class vistable {
                 }
             }
             $out .= "</table></body></html>";
+            break;
         case 'tsv-excel':
             if (isset($this->params['outFileName'])) {
                 header('Content-type: text/text/tab-separated-values; charset="UTF-16"');
