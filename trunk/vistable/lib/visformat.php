@@ -329,6 +329,10 @@ class DateFormatter {
 
     public function __construct($locale, $tz, $format) {
         $this->locale = $locale;
+        if (preg_match('/^%([A-Z]+):(.*)$/',$format,$matches)) {
+            $tz = $matches[1];
+            $format = $matches[2];
+        }
         $this->format = $format;
         $this->timezone = new DateTimeZone($tz);
         $date = new DateTime("", $this->timezone);
@@ -405,6 +409,13 @@ class DateFormatter {
             break;
         case 'H': //        hour in day (0~23)      (Number)            0
             $pat = "%H";
+            if ($count > 2) {
+                $pat = (string)(int)floor($date/3600);
+                $c = strlen($pat);
+                if ($c > $count) $c = $count;
+                $pat = substr($pat, -$c);
+                $pat = str_pad($pat, $count, " ", STR_PAD_LEFT);
+            }
             break;
         case 'm': //        minute in hour          (Number)            30
             $pat = "%M";
