@@ -309,17 +309,23 @@ abstract class vistable {
                 case 'date':
                     if (is_string($v) && preg_match('/^(....)-(..)-(..)$/', $v, $matches)) {
                         $v = $this->mktime($matches[1],$matches[2],$matches[3], 0, 0, 0);
+                    } else {
+                        $v = (double)$v;
                     }
                     break;
                 case 'timeofday':
                     if (is_string($v) && preg_match('/^(..):(..):(..)$/', $v, $matches)) {
                         $v = $this->mktime(0,0,0,$matches[1],$matches[2],$matches[3]);
+                    } else {
+                        $v = (double)$v;
                     }
                     break;
                 case 'datetime':
                     if (is_string($v) && preg_match('/^(....)-(..)-(..) (..):(..):(..)$/', $v, $matches)) {
                         $v = $this->mktime($matches[1],$matches[2],$matches[3],
                                            $matches[4],$matches[5],$matches[6]);
+                    } else {
+                        $v = (double)$v;
                     }
                     break;
                 case 'number':
@@ -634,24 +640,30 @@ abstract class vistable {
 
             foreach ($cols as &$colref) {
                 if (isset($colref['pattern'])) {
-                    if ($colref['type'] == 'number') {
+                    switch ($colref['type']) {
+                    case 'number':
                         $colref['fmt'] = new NumberFormatter($this->locale,
                                                              NumberFormatter::PATTERN_DECIMAL, 
                                                              $colref['pattern']);
                         if ($this->debug) {
                             print_r($colref['fmt']);
                         }
-                    } else if ($colref['type'] == 'date' || $colref['type'] == 'datetime') {
+                        break;
+                    case 'date':
+                    case 'datetime':
+                    case 'timeofday':
                         $colref['fmt'] = new DateFormatter($this->locale, $this->tz,
                                                            $colref['pattern']);
                         if ($this->debug) {
                             print_r($colref['fmt']);
                         }
-                    } else if ($colref['type'] == 'boolean') {
+                        break;
+                    case 'boolean':
                         $colref['fmt'] = new BoolFormatter($colref['pattern']);
                         if ($this->debug) {
                             print_r($colref['fmt']);
                         }
+                        break;
                     }
                 } else if (isset($formatters[$colref['type']])) {
                     $colref['fmt'] = $formatters[$colref['type']];
@@ -881,6 +893,9 @@ class mysql_vistable extends vistable {
                 if (isset($value["sql_field"])) {
                     $sql_field = $value["sql_field"];
                 }
+                $value[TYPE] = SIMPLE;
+                $value[VALUE] = $key;
+                $this->fields[$key] = $value;
             } else {
                 $this->fields[$key] = array(TYPE=>SIMPLE, VALUE=>$key);
             }
@@ -1049,7 +1064,6 @@ class mysql_vistable extends vistable {
                 $f = "";
                 if (isset($value["sql_field"])) {
                     $f .= " {$value["sql_field"]} AS";
-                    # $this->fields[$key]["sql_field"] = $sql_field;
                 }
                 $f .= " $key";
                 $fields[] = $f;
