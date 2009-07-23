@@ -235,6 +235,11 @@ abstract class vistable {
                 case 'quarter':$a=getdate($args[0]);$v = (int)(($a['mon']-1)/3)+1; break;
                 case 'datediff':$v = (int)($args[0] / (3600 * 24)) - (int)($args[1] / (3600 * 24)); break;
                 case 'now': $v = time(); break;
+                case 'date':
+                case 'datetime':
+                case 'timeofday':
+                    $v = $this->convert_literal($v, $args[0]);
+                    break;
                 case 'todate':
                     $v = 0;
                     switch ($q[0]["type"]) {
@@ -964,8 +969,12 @@ class mysql_vistable extends vistable {
                     }
                 case FUNCT:
                     switch ($v) {
+                        case 'timeofday':
+                        case 'datetime':
+                            return "(".$this->write_expr($q[0]).")";
                         case 'now':
                             return "CONCAT(CURRENT_DATE,' ',CURRENT_TIME)";
+                        case 'date':
                         case 'todate':
                             return $this->write_func("date", $q);
                     }
