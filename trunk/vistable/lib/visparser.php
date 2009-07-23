@@ -220,6 +220,67 @@ class visparser {
         return $val;
     }
 
+    private function getFuncTerm($id)
+    {
+        $ret = array(TYPE => FUNCT, VALUE => $id);
+        $type = 'string';
+        $this->next_token();
+        if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ')') {
+            while (TRUE) {
+                $arg =& $this->getColumnExpr();
+                $type = $arg['type'];
+                $ret[] =& $arg;
+                if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ',') {
+                    break;
+                }
+                $this->next_token();
+            }
+        }
+        if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ')') {
+            $this->error("Missing ')'");
+        }
+        $this->next_token();
+        switch ($id) {
+            case 'max':
+            case 'min':
+                $ret['is_aggregate'] = 1;
+                break;
+            case 'count':
+            case 'sum':
+            case 'avg':
+                $ret['is_aggregate'] = 1;
+            case 'year':
+            case 'month':
+            case 'day':
+            case 'hour':
+            case 'minute':
+            case 'second':
+            case 'millisecond':
+            case 'quarter':
+            case 'dayofweek':
+            case 'datediff':
+                $type = 'number';
+                break;
+            case 'now':
+                $type = 'datetime';
+                break;
+            case 'todate':
+                $type = 'date';
+                break;
+            case 'upper':
+            case 'lower':
+                $type = 'string';
+                break;
+            case 'datetime':
+            case 'date':
+            case 'timeofday':
+                $type = $id;
+                break;
+        }
+        $ret['type'] = $type;
+        return $ret;
+    }
+
     private function getColumnTermInt()
     {
         if ($this->tok[TYPE] == ID) {
@@ -232,59 +293,7 @@ class visparser {
                 $this->fields[$id]['is_used'] = TRUE;
                 return $this->fields[$id];
             }
-
-            $ret = array(TYPE => FUNCT, VALUE => $id);
-            $type = 'string';
-            $this->next_token();
-            if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ')') {
-                while (TRUE) {
-                    $arg =& $this->getColumnExpr();
-                    $type = $arg['type'];
-                    $ret[] =& $arg;
-                    if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ',') {
-                        break;
-                    }
-                    $this->next_token();
-                }
-            }
-            if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ')') {
-                $this->error("Missing ')'");
-            }
-            $this->next_token();
-            switch ($id) {
-                case 'max':
-                case 'min':
-                    $ret['is_aggregate'] = 1;
-                    break;
-                case 'count':
-                case 'sum':
-                case 'avg':
-                    $ret['is_aggregate'] = 1;
-                case 'year':
-                case 'month':
-                case 'day':
-                case 'hour':
-                case 'minute':
-                case 'second':
-                case 'millisecond':
-                case 'quarter':
-                case 'dayofweek':
-                case 'datediff':
-                    $type = 'number';
-                    break;
-                case 'now':
-                    $type = 'datetime';
-                    break;
-                case 'todate':
-                    $type = 'date';
-                    break;
-                case 'upper':
-                case 'lower':
-                    $type = 'string';
-                    break;
-            }
-            $ret['type'] = $type;
-            return $ret;
+            return $this->getFuncTerm($id);
         }
 
         if ($this->tok[TYPE] == OPERATOR && $this->tok[VALUE] == '(') {
@@ -317,6 +326,9 @@ class visparser {
            case 'timeofday':
            case 'datetime':
                $this->next_token();
+               if ($this->tok[TYPE] == OPERATOR && $this->tok[VALUE] == '(') {
+                   return $this->getFuncTerm($v);
+               }
                if ($this->tok[TYPE] != STRING) break;
                $ret = array(TYPE => LITERAL, VALUE=>$this->tok[VALUE], 'type' => $v);
                $this->next_token();
