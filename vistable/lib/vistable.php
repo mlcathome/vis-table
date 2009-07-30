@@ -37,6 +37,10 @@ function vistable_order_function($a, $b)
 abstract class vistable {
     protected $query;
     protected $params;
+    protected $needs_total_rows;
+    protected $total_rows;
+    protected $first_row;
+    protected $num_rows;
 
     private $response;
     private $tqrt;
@@ -92,6 +96,11 @@ abstract class vistable {
     public function get_param($param,$default = NULL)
     {
         return isset($this->params[$param]) ? $this->params[$param] : $default;
+    }
+
+    public function set_param($param, $value)
+    {
+        $this->params[$param] = $value;
     }
 
     private function diagnostic($kind, $reason, $message, $detailed_message)
@@ -368,9 +377,8 @@ abstract class vistable {
         return $v;
     }
 
-    protected function make_order($elist, &$cols, &$exprs)
+    protected function make_order($elist, $order, &$cols, &$exprs)
     {
-        $order = array();
         foreach ($elist as &$col) {
             $dir = isset($col['dir']) && $col['dir'] == 'desc' ? -1 : 1;
             $s = $this->write_expr($col);
@@ -413,10 +421,16 @@ abstract class vistable {
         unset($col);
 
         $ncol = count($cols);
+        if (isset($this->params['sortcol']) &&
+            isset($exprs[$this->params['sortcol']]))
+        {
+            $order[$this->params['sortcol']] = !strcasecmp($this->params['sortdir'], 'desc') ? 'desc' : 'asc';
+        }
+
         if (isset($query['order'])) {
-            $order = $this->make_order($query['order'], $cols, $exprs);
+            $order = $this->make_order($query['order'], $order, $cols, $exprs);
         } else if (isset($query['group'])) {
-            $order = $this->make_order($query['group'], $cols, $exprs);
+            $order = $this->make_order($query['group'], $order, $cols, $exprs);
         }
 
         /* If grouping/pivoting is required, match the rows to their groups */
@@ -426,7 +440,7 @@ abstract class vistable {
         $porder = NULL;
         if ($pa || $ga) {
             if ($pa) {
-                $porder = $this->make_order($query['pivot'], $cols, $exprs);
+                $porder = $this->make_order($query['pivot'], array(), $cols, $exprs);
             }
             foreach ($rows as $row) {
                 if (!$query['where'] ||
@@ -588,23 +602,40 @@ abstract class vistable {
             $rout = $nrows;
         }
 
-        $offset = 0;
-        $limit = count($rout);
+        $this->total_rows = count($rout);
 
-        if ($query['offset']) {
-            $offset = $this->evaluate(NULL, $query['offset']);
-        }
-        if ($query['limit']) {
-            $limit = $this->evaluate(NULL, $query['limit']);
+        $this->first_row = $query['offset'] ? $this->evaluate(NULL, $query['offset']) : 0;
+        $this->num_rows = $query['limit'] ? $this->evaluate(NULL, $query['limit']) : $this->total_rows;
+
+        if (isset($this->params['pagenum']) && isset($this->params['pagerow'])) {
+            $pr = intval($this->params['pagerow']);
+            $pn = intval($this->params['pagenum']);
+
+            if ($pr > 0) {
+                if ($pr > $this->total_rows) $pr = $this->total_rows;
+                $mp = ceil($this->total_rows / $pr);
+                if ($pn > $mp) $pn = $mp;
+                if ($pn < 1) $pn = 1;
+                $this->first_row = ($pn - 1) * $pr;
+                $this->num_rows = $pr;
+            }
         }
 
-        $rows = array_slice($rout, $offset, $limit);
+        $rows = array_slice($rout, $this->first_row, $this->num_rows);
         return $cols;
     }
 
     public function execute()
     {
         $table = NULL;
+
+        $outfmt = "json";
+        if (isset($this->params["out"])) {
+            $outfmt = $this->params["out"];
+        }
+        if ($outfmt == 'jqgrid') {
+            $this->needs_total_rows = TRUE;
+        }
 
         if ($this->response['status'] != 'error') {
 
@@ -620,11 +651,6 @@ abstract class vistable {
             } else {
                 $table = $this->fetch_table($this->query);
             }
-        }
-
-        $outfmt = "json";
-        if (isset($this->params["out"])) {
-            $outfmt = $this->params["out"];
         }
 
         if ($table) {
@@ -781,7 +807,7 @@ abstract class vistable {
             break;
         case 'tsv-excel':
             if (isset($this->params['outFileName'])) {
-                header('Content-type: text/text/tab-separated-values; charset="UTF-16"');
+                header('Content-type: text/tab-separated-values; charset="UTF-16"');
                 header('Content-disposition: attachment; filename='.$this->params['outFileName']);
             } else {
                 header('Content-type: text/plain; charset="UTF-16"');
@@ -792,6 +818,52 @@ abstract class vistable {
                     $out .= self::tsv_row($row['c'], 'f');
                 }
             }
+            break;
+        case 'jqgrid':
+            $out = array("records" => $this->total_rows);
+            if ($this->num_rows > 0) {
+                $out['page'] = floor($this->first_row / $this->num_rows)+1;
+                $out['total'] = ceil($this->total_rows / $this->num_rows);
+            } else {
+                $out['page'] = 0;
+                $out['total'] = 1;
+            }
+
+            $rows = array();
+            foreach ($table['rows'] as $row) {
+                $r = array();
+                foreach ($row['c'] as $c) {
+                    array_push($r, $c['f']);
+                }
+                array_push($rows, $r);
+            }
+            $out['rows'] = $rows;
+
+            $out = json_encode($out);
+            break;
+
+        case 'jqgrid-reader':
+            header('Content-type: text/plain; charset="UTF-8"');
+            $colmodel = array();
+            foreach ($table['cols'] as $col) {
+                $c = array('label' => $col['label'],
+                           'name' => $col['id']);
+                if ($col['type'] == 'number') {
+                    $c['align'] = 'right';
+                }
+                array_push($colmodel, $c);
+            }
+
+            $out = array(jsonReader => array("root" => "rows", 
+                                             "page" => "page",
+                                             "total" => "total",
+                                             "records" => "records",
+                                             "cell" => "",
+                                             "id" => "0"),
+                         colModel => $colmodel
+                         );
+
+            $out = json_encode($out);
             break;
 
         case 'debug':
@@ -1000,7 +1072,6 @@ class mysql_vistable extends vistable {
 
     private function vis_query2sql_query($query, &$cols)
     {
-        $q = "SELECT ";
         $fields = array();
         $cols = array();
         $order = array();
@@ -1020,6 +1091,15 @@ class mysql_vistable extends vistable {
             $cols[] = $col;
         }
 
+        if ($this->debug) {
+            echo "\n\nsortcol: ",$this->params['sortcol'],"\n\n\n";
+        }
+        if (isset($this->params['sortcol']) &&
+            isset($fields[$this->params['sortcol']]))
+        {
+            $order[] = "`".$this->params['sortcol']."` ".(!strcasecmp($this->params['sortdir'], 'desc') ? 'desc' : 'asc');
+        }
+
         if (isset($query['order'])) {
             foreach ($query['order'] as $value) {
                 $dir = isset($value['dir']) && $value['dir'] == 'desc' ? 'desc' : 'asc';
@@ -1033,7 +1113,8 @@ class mysql_vistable extends vistable {
             }
         }
 
-        $q .= implode(",",$fields)." FROM ".$this->tables;
+        $select = "SELECT " . implode(",",$fields);
+        $q = " FROM ".$this->tables;
         if ($query['where']) {
             $q .= " WHERE ".$this->sql_expr($query['where'], 1);
         }
@@ -1048,12 +1129,48 @@ class mysql_vistable extends vistable {
         if ($query['having']) {
             $q .= " HAVING ".$this->sql_expr($query['where'], 1);
         }
+
+        $this->first_row = $query['offset'] ? $this->evaluate(NULL, $query['offset']) : 0;
+        $this->num_rows = $query['limit'] ? $this->evaluate(NULL, $query['limit']) : -1;
+
+        if ($this->needs_total_rows) {
+            $t = "SELECT count(*)";
+            if ($query['group']) {
+                $t .= " FROM ($select$q) AS t1";
+            } else {
+                $t .= $q;
+            }
+            $data = mysql_query($t);
+            if (!$data || !($t = mysql_fetch_row($data))) {
+                $this->error("internal_error", "query_failed", "query `$t' failed:".mysql_error());
+                return FALSE;
+            }
+            $this->total_rows = (int)$t[0];
+
+            if (isset($this->params['pagenum']) && isset($this->params['pagerow'])) {
+                $pr = intval($this->params['pagerow']);
+                $pn = intval($this->params['pagenum']);
+
+                if ($pr > 0) {
+                    if ($pr > $this->total_rows) $pr = $this->total_rows;
+                    $mp = ceil($this->total_rows / $pr);
+                    if ($pn > $mp) $pn = $mp;
+                    if ($pn < 1) $pn = 1;
+                    $this->first_row = ($pn - 1) * $pr;
+                    $this->num_rows = $pr;
+                }
+            }
+        }
+
         if (count($order)) {
             $q .= " ORDER BY ".implode(",",$order);
         }
-        if ($query['limit'] || $query['offset']) {
-            $o = $query['offset'] ? $this->sql_expr($query['offset'], 0) : "0";
-            $l = $query['limit'] ? $this->sql_expr($query['limit'], 0) : "1000000000";
+
+        $q = $select . $q;
+
+        if ($this->num_rows >= 0 || $this->first_row > 0) {
+            $o = $this->first_row;
+            $l = $this->num_rows >= 0 ? $this->num_rows : 1000000000;
             $q .= " LIMIT $o,$l";
         }
 
