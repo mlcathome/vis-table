@@ -643,6 +643,7 @@ abstract class vistable {
             $this->query = $parser->parse($this->tq);
 
             if ($this->debug) {
+                print "tq: $tq\n";
                 print_r($parser);
             }
 
@@ -842,14 +843,20 @@ abstract class vistable {
             $out = json_encode($out);
             break;
 
-        case 'jqgrid-reader':
+        case 'jqgrid-config':
             header('Content-type: text/plain; charset="UTF-8"');
             $colmodel = array();
             foreach ($table['cols'] as $col) {
                 $c = array('label' => $col['label'],
                            'name' => $col['id']);
-                if ($col['type'] == 'number') {
+                switch ($col['type']) {
+                case 'number':
                     $c['align'] = 'right';
+                    $c['sortorder'] = 'float';
+                    break;
+                case 'date':
+                    $c['sortorder'] = 'date';
+                    break;
                 }
                 array_push($colmodel, $c);
             }
