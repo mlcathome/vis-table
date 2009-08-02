@@ -98,6 +98,11 @@ abstract class vistable {
         return isset($this->params[$param]) ? $this->params[$param] : $default;
     }
 
+    public function get_sig()
+    {
+        return isset($this->response['sig']) ? $this->response['sig'] : FALSE;
+    }
+
     public function set_param($param, $value)
     {
         $this->params[$param] = $value;
@@ -744,7 +749,7 @@ abstract class vistable {
         }
 
         $this->response['sig'] = $sig;
-
+        
         if ($this->response['status'] == 'error') {
             $table = NULL;
             unset($this->response['warnings']);
@@ -954,15 +959,17 @@ abstract class vistable {
 class mysql_vistable extends vistable {
     private $tables;
     private $mode = 0;
+    private $where = null;
 
     public function __construct($tqx,$tq,$tqrt,$tz,$locale,$extra=NULL) {
         parent::__construct($tqx,$tq,$tqrt,$tz,$locale,$extra);
     }
         
-    public function setup_database($tables, $fields)
+    public function setup_database($tables, $fields, $where)
     {
         $this->tables = $tables;
         $this->fields = $fields;
+        $this->where = $where;
 
         $q = "SELECT";
         $fields = array();
@@ -1123,8 +1130,14 @@ class mysql_vistable extends vistable {
         $select = "SELECT " . implode(",",$fields);
         $q = " FROM ".$this->tables;
         if ($query['where']) {
-            $q .= " WHERE ".$this->sql_expr($query['where'], 1);
+            $q .= " WHERE(".$this->sql_expr($query['where'], 1).")";
+            if ($this->where) {
+                $q .= "AND(".$this->where.")";
+            }
+        } else if ($this->where) {
+            $q .= " WHERE ".$this->where;
         }
+
         if ($query['group']) {
             $q .= " GROUP BY ";
             $fields = array();
@@ -1134,7 +1147,7 @@ class mysql_vistable extends vistable {
             $q .= implode(",", $fields);
         }
         if ($query['having']) {
-            $q .= " HAVING ".$this->sql_expr($query['where'], 1);
+            $q .= " HAVING ".$this->sql_expr($query['having'], 1);
         }
 
         $this->first_row = $query['offset'] ? $this->evaluate(NULL, $query['offset']) : 0;
