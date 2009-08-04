@@ -205,6 +205,15 @@ abstract class vistable {
         return intval(gmdate($part, $date)) + $offset;
     }
 
+    private function dateparts($parts, $date)
+    {
+        $result = array();
+        foreach ($parts as $part) {
+            $result[] = $this->datepart($part,$date);
+        }
+        return $result;
+    }
+
     public function evaluate($row, &$q)
     {
         $v = $q[VALUE];
@@ -326,15 +335,15 @@ abstract class vistable {
         if ($v !== NULL) {
             switch ($type) {
                 case 'date':
-                    if (is_string($v) && preg_match('/^(....)-(..)-(..)$/', $v, $matches)) {
+                    if (is_string($v) && preg_match('/^(....)-(..)-(..)( (..):(..):(..))?$/', $v, $matches)) {
                         $v = $this->mktime($matches[1],$matches[2],$matches[3], 0, 0, 0);
                     } else {
                         $v = (double)$v;
                     }
                     break;
                 case 'timeofday':
-                    if (is_string($v) && preg_match('/^(..):(..):(..)$/', $v, $matches)) {
-                        $v = $this->mktime(0,0,0,$matches[1],$matches[2],$matches[3]);
+                    if (is_string($v) && preg_match('/^((....)-(..)-(..) )?(..):(..):(..)$/', $v, $matches)) {
+                        $v = $this->mktime(1971,1,1,$matches[5],$matches[6],$matches[7]);
                     } else {
                         $v = (double)$v;
                     }
@@ -367,16 +376,16 @@ abstract class vistable {
         if ($v !== NULL) {
             switch ($type) {
                 case 'date':
-                    $a = getdate($v);
-                    $m = $a['mon']-1;
-                    return "new Date({$a['year']},$m,{$a['mday']})";
+                    $a = $this->dateparts(array('year', 'month', 'day'), $v);
+                    $m = $a[1]-1;
+                    return "new Date({$a[0]},$m,{$a[2]})";
                 case 'timeofday':
-                    $a = getdate($v);
-                    return "[{$a['hours']},{$a['minutes']},{$a['seconds']}]";
+                    $a = $this->dateparts(array('hour', 'minute', 'second'), $v);
+                    return "[{$a[0]},{$a[1]},{$a[2]}]";
                 case 'datetime':
-                    $a = getdate($v);
-                    $m = $a['mon']-1;
-                    return "new Date({$a['year']},$m,{$a['mday']},{$a['hours']},{$a['minutes']},{$a['seconds']})";
+                    $a = $this->dateparts(array('year', 'month', 'day', 'hour', 'minute', 'second'), $v);
+                    $m = $a[1]-1;
+                    return "new Date({$a[0]},$m,{$a[2]},{$a[3]},{$a[4]},{$a[5]})";
             }
         }
         return $v;
@@ -1056,13 +1065,17 @@ class mysql_vistable extends vistable {
                 case FUNCT:
                     switch ($v) {
                         case 'timeofday':
+                            return $this->write_func("time", $q);
                         case 'datetime':
                             return "(".$this->write_expr($q[0]).")";
-                        case 'now':
-                            return "CONCAT(CURRENT_DATE,' ',CURRENT_TIME)";
                         case 'date':
                         case 'todate':
                             return $this->write_func("date", $q);
+                        case 'now':
+                            if ($this->gmt_offset) {
+                                return "(now()+INTERVAL "+$this->gmt_offset+" SECOND)";
+                            }
+                            break;
                     }
                     break;
                 case SIMPLE:
