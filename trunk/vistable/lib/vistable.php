@@ -1183,9 +1183,9 @@ class mysql_vistable extends vistable {
             if (isset($this->params['pagenum']) && isset($this->params['pagerow'])) {
                 $pr = intval($this->params['pagerow']);
                 $pn = intval($this->params['pagenum']);
-
+                if ($pr > $this->total_rows) $pr = $this->total_rows;
+                    
                 if ($pr > 0) {
-                    if ($pr > $this->total_rows) $pr = $this->total_rows;
                     $mp = ceil($this->total_rows / $pr);
                     if ($pn > $mp) $pn = $mp;
                     if ($pn < 1) $pn = 1;
