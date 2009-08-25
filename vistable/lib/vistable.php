@@ -746,7 +746,13 @@ abstract class vistable {
             $this->response['table'] = $table;
         }
 
-        $sig = md5(json_encode($this->response));
+        $sig = json_encode($this->response);
+        if ($this->needs_total_rows) {
+            $sig .= ":".$this->total_rows.":".$this->first_row;
+        }
+
+        $sig = md5($sig);
+
         if ($sig == $this->params['sig']) {
             $this->error('not_modified', '', '');
         }
