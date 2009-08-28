@@ -317,6 +317,10 @@ class visparser {
        if ($this->tok[TYPE] == RESID) {
            $v = $this->tok[VALUE];
            switch ($v) {
+           case 'not':
+               $this->next_token();
+               $term = & $this->getColumnTerm();
+               return array(TYPE => OPERATOR, VALUE => $v, 'type' => 'boolean', &$term);
            case 'true':
            case 'false':
                return array(TYPE => LITERAL, VALUE => $this->tok[VALUE] == 'true', 'type' => 'boolean');
@@ -381,7 +385,6 @@ class visparser {
                 case '<>': $p2 = 7; break;
                 case 'and': $p2 = 6; break;
                 case 'or': $p2 = 5; break;
-                case 'not': $p2 = 100; break;
             }
             if ($p2 < $prec) break;
             if ($p2 <= 8 || $p2 == 100) $type = 'boolean';
