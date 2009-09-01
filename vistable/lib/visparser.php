@@ -111,6 +111,15 @@ class visparser {
                     $ndot = 1;
                 }
             }
+            if ($ch == 'e' || $ch == 'E') {
+                $ch = substr($q,++$end,1);
+                if ($ch == '+' || $ch == '-') {
+                    $ch = substr($q,++$end,1);
+                }
+                while (ctype_digit($ch)) {
+                    $ch = substr($q,++$end,1);
+                }
+            }
             $ret = array(TYPE => NUMBER, VALUE => substr($q, $start, $end-$start));
         } else if (ctype_punct($ch)) {
             $end = $start + 1;
