@@ -841,6 +841,7 @@ abstract class vistable {
             }
             break;
         case 'jqgrid':
+            header('Content-type: text/json; charset="UTF-8"');
             $out = array("records" => $this->total_rows);
             if ($this->num_rows > 0) {
                 $out['page'] = floor($this->first_row / $this->num_rows)+1;
@@ -862,6 +863,25 @@ abstract class vistable {
 
             $out = json_encode($out);
             break;
+        case 'jqgrid-xml':
+            header('Content-type: application/xml; charset="UTF-8"');
+            $out = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
+            $page = $this->num_rows > 0 ? floor($this->first_row / $this->num_rows)+1 : 0;
+            $total = $this->num_rows > 0 ? ceil($this->total_rows / $this->num_rows) : 1;
+            $out .= "<jqgrid><rows>";
+            $out .= "<records>{$this->total_rows}</records>";
+            $out .= "<page>{$page}</page>";
+            $out .= "<total>{$total}</total>";
+            $rows = array();
+            foreach ($table['rows'] as $row) {
+                $out .= "<row>";
+                foreach ($row['c'] as $c) {
+                    $out .= "<cell>".htmlspecialchars($c['f'], ENT_COMPAT, "UTF-8")."</cell>";
+                }
+                $out .= "</row>";
+            }
+            $out .= "</rows></jqgrid>";
+            break;
 
         case 'jqgrid-config':
             header('Content-type: text/plain; charset="UTF-8"');
@@ -881,13 +901,13 @@ abstract class vistable {
                 array_push($colmodel, $c);
             }
 
-            $out = array(jsonReader => array("root" => "rows", 
+            $out = array("jsonReader" => array("root" => "rows", 
                                              "page" => "page",
                                              "total" => "total",
                                              "records" => "records",
                                              "cell" => "",
                                              "id" => "0"),
-                         colModel => $colmodel
+                         "colModel" => $colmodel
                          );
 
             $out = json_encode($out);
