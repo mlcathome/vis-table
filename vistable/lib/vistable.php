@@ -647,7 +647,7 @@ abstract class vistable {
         if (isset($this->params["out"])) {
             $outfmt = $this->params["out"];
         }
-        if ($outfmt == 'jqgrid') {
+        if ($outfmt == 'jqgrid' || $outfmt == 'jqgrid-xml') {
             $this->needs_total_rows = TRUE;
         }
 
