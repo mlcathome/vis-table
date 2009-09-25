@@ -195,6 +195,9 @@ class NumberFormatter {
             $format = $this->pos_format;
         }
 
+        if ($format['multiplier']) {
+          $number *= $format['multiplier'];
+        }
         if ($format[2]) {
             $exp_group = 1;
             if (isset($format['sigmax'])) {
