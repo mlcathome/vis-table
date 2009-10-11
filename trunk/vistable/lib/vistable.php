@@ -405,6 +405,35 @@ abstract class vistable {
         return $order;
     }
 
+    protected function setup_rownums($query, $total)
+    {
+        $this->total_rows = $total;
+        $this->first_row = $query['offset'] ? $this->evaluate(NULL, $query['offset']) : 0;
+        $this->num_rows = $query['limit'] ? $this->evaluate(NULL, $query['limit']) : $total;
+
+        if ($total >= 0 && isset($this->params['pagenum']) && isset($this->params['pagerow'])) {
+            $pr = intval($this->params['pagerow']);
+            $pn = intval($this->params['pagenum']);
+            $np = 1;
+            if (isset($this->params['numpage'])) {
+                $np = intval($this->params['numpage']);
+            }
+            if ($pr > 0) {
+                if ($pr > $total) $pr = $total;
+                $mp = ceil($total / $pr);
+                if ($pn > $mp) $pn = $mp;
+                if ($pn < 1) $pn = 1;
+                $this->first_row = ($pn - 1) * $pr;
+                $this->num_rows = $pr * $np;
+                if ($this->first_row + $this->num_rows > $total) {
+                    $this->num_rows = $total-$this->first_row;
+                }
+                $this->page_num = floor($this->first_row / $pr) + 1;
+                $this->total_pages = $mp;
+            }
+        }
+    }
+
     public function query_filter(&$rows, $query)
     {
         $pivot_key = "pivot|key";
@@ -616,24 +645,7 @@ abstract class vistable {
             $rout = $nrows;
         }
 
-        $this->total_rows = count($rout);
-
-        $this->first_row = $query['offset'] ? $this->evaluate(NULL, $query['offset']) : 0;
-        $this->num_rows = $query['limit'] ? $this->evaluate(NULL, $query['limit']) : $this->total_rows;
-
-        if (isset($this->params['pagenum']) && isset($this->params['pagerow'])) {
-            $pr = intval($this->params['pagerow']);
-            $pn = intval($this->params['pagenum']);
-
-            if ($pr > 0) {
-                if ($pr > $this->total_rows) $pr = $this->total_rows;
-                $mp = ceil($this->total_rows / $pr);
-                if ($pn > $mp) $pn = $mp;
-                if ($pn < 1) $pn = 1;
-                $this->first_row = ($pn - 1) * $pr;
-                $this->num_rows = $pr;
-            }
-        }
+        $this->setup_rownums($query, count($rout));
 
         $rows = array_slice($rout, $this->first_row, $this->num_rows);
         return $cols;
@@ -844,8 +856,9 @@ abstract class vistable {
             header('Content-type: text/json; charset="UTF-8"');
             $out = array("records" => $this->total_rows);
             if ($this->num_rows > 0) {
-                $out['page'] = floor($this->first_row / $this->num_rows)+1;
-                $out['total'] = ceil($this->total_rows / $this->num_rows);
+                $out['page'] = $this->page_num;
+                $out['total'] = $this->total_pages;
+                $out['num_rows'] = $this->num_rows;
             } else {
                 $out['page'] = 0;
                 $out['total'] = 1;
@@ -866,12 +879,13 @@ abstract class vistable {
         case 'jqgrid-xml':
             header('Content-type: application/xml; charset="UTF-8"');
             $out = '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>';
-            $page = $this->num_rows > 0 ? floor($this->first_row / $this->num_rows)+1 : 0;
-            $total = $this->num_rows > 0 ? ceil($this->total_rows / $this->num_rows) : 1;
+            $page = $this->num_rows > 0 ? $this->page_num : 0;
+            $total = $this->num_rows > 0 ? $this->total_pages : 1;
             $out .= "<jqgrid><rows>";
             $out .= "<records>{$this->total_rows}</records>";
             $out .= "<page>{$page}</page>";
             $out .= "<total>{$total}</total>";
+            $out .= "<num_rows>{$this->num_rows}</num_rows>";
             $rows = array();
             foreach ($table['rows'] as $row) {
                 $out .= "<row>";
@@ -1189,9 +1203,7 @@ class mysql_vistable extends vistable {
             $q .= " HAVING ".$this->sql_expr($query['having'], 1);
         }
 
-        $this->first_row = $query['offset'] ? $this->evaluate(NULL, $query['offset']) : 0;
-        $this->num_rows = $query['limit'] ? $this->evaluate(NULL, $query['limit']) : -1;
-
+        $total = -1;
         if ($this->needs_total_rows) {
             $t = "SELECT count(*)";
             if ($query['group']) {
@@ -1204,22 +1216,9 @@ class mysql_vistable extends vistable {
                 $this->error("internal_error", "query_failed", "query `$t' failed:".mysql_error());
                 return FALSE;
             }
-            $this->total_rows = (int)$t[0];
-
-            if (isset($this->params['pagenum']) && isset($this->params['pagerow'])) {
-                $pr = intval($this->params['pagerow']);
-                $pn = intval($this->params['pagenum']);
-                if ($pr > $this->total_rows) $pr = $this->total_rows;
-                    
-                if ($pr > 0) {
-                    $mp = ceil($this->total_rows / $pr);
-                    if ($pn > $mp) $pn = $mp;
-                    if ($pn < 1) $pn = 1;
-                    $this->first_row = ($pn - 1) * $pr;
-                    $this->num_rows = $pr;
-                }
-            }
+            $total = (int)$t[0];
         }
+        $this->setup_rownums($query, $total);
 
         if (count($order)) {
             $q .= " ORDER BY ".implode(",",$order);
