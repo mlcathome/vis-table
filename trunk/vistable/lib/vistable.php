@@ -418,7 +418,7 @@ abstract class vistable {
             if (isset($this->params['numpage'])) {
                 $np = intval($this->params['numpage']);
             }
-            if ($pr > 0) {
+            if ($pr > 0 && $total > 0) {
                 if ($pr > $total) $pr = $total;
                 $mp = ceil($total / $pr);
                 if ($pn > $mp) $pn = $mp;
