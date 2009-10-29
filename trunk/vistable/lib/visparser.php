@@ -546,15 +546,14 @@ class visparser {
         $this->result['order'] = array();
         while (true) {
             $col_id =& $this->getColumnExpr();
-            $dir = 'asc';
             if ($this->tok[TYPE] == RESID &&
                 ($this->tok[VALUE] == 'asc' || $this->tok[VALUE] == 'desc'))
             {
-                $dir = $this->tok[VALUE];
+                $col_id['dir'] = $this->tok[VALUE];
                 $this->next_token();
+            } else if (!$col_id['dir']) {
+                $col_id['dir'] = 'asc';
             }
-
-            $col_id['dir'] = $dir;
             $this->result['order'][] = &$col_id;
             if ($this->tok[TYPE] != OPERATOR || $this->tok[VALUE] != ',') {
                 break;
